@@ -1,0 +1,15 @@
+{
+  "name": "telegram-claude-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that bridges Claude Code to Telegram for remote user interaction",
+  "type": "module",
+  "main": "telegram-bridge.js",
+  "scripts": {
+    "start": "node telegram-bridge.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "zod": "^3.24.0"
+  }
+}
