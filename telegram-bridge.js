@@ -17,9 +17,9 @@ if (!BOT_TOKEN || !CHAT_ID) {
 
 const ASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-// --- Telegram Bot ---
+// --- Telegram Bot (polling starts AFTER MCP connects) ---
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN, { polling: false });
 
 // Track the single pending ask_user request
 let pendingResolve = null;
@@ -27,7 +27,6 @@ let pendingResolve = null;
 bot.on("message", (msg) => {
   if (String(msg.chat.id) !== String(CHAT_ID)) return;
   if (!pendingResolve) return;
-  // Ignore messages that are just button-press notifications
   if (msg.text === undefined) return;
 
   const resolve = pendingResolve;
@@ -38,7 +37,6 @@ bot.on("message", (msg) => {
 bot.on("callback_query", async (query) => {
   if (String(query.message.chat.id) !== String(CHAT_ID)) return;
 
-  // Acknowledge the button press to remove loading state
   await bot.answerCallbackQuery(query.id);
 
   if (!pendingResolve) return;
@@ -59,26 +57,22 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-server.registerTool(
+server.tool(
   "ask_user",
+  "Send a question to the user via Telegram and wait for their response. " +
+    "Optionally include inline buttons for quick replies. " +
+    "Times out after 10 minutes.",
   {
-    title: "Ask User via Telegram",
-    description:
-      "Send a question to the user via Telegram and wait for their response. " +
-      "Optionally include inline buttons for quick replies. " +
-      "Times out after 10 minutes.",
-    inputSchema: {
-      message: z.string().describe("The question or message to send"),
-      buttons: z
-        .array(z.string())
-        .optional()
-        .describe(
-          "Optional list of button labels for quick replies (inline keyboard)"
-        ),
-    },
+    message: z.string().describe("The question or message to send"),
+    buttons: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Optional list of button labels for quick replies (inline keyboard)"
+      ),
   },
   async ({ message, buttons }) => {
-    const opts = { parse_mode: "Markdown" };
+    const opts = { parse_mode: "HTML" };
 
     if (buttons && buttons.length > 0) {
       opts.reply_markup = {
@@ -93,7 +87,6 @@ server.registerTool(
 
     await bot.sendMessage(CHAT_ID, message, opts);
 
-    // Wait for user response
     const response = await new Promise((resolve, reject) => {
       pendingResolve = resolve;
 
@@ -111,19 +104,15 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   "notify_user",
+  "Send a notification message to the user via Telegram. " +
+    "Does not wait for a response.",
   {
-    title: "Notify User via Telegram",
-    description:
-      "Send a notification message to the user via Telegram. " +
-      "Does not wait for a response.",
-    inputSchema: {
-      message: z.string().describe("The notification message to send"),
-    },
+    message: z.string().describe("The notification message to send"),
   },
   async ({ message }) => {
-    await bot.sendMessage(CHAT_ID, message, { parse_mode: "Markdown" });
+    await bot.sendMessage(CHAT_ID, message, { parse_mode: "HTML" });
     return {
       content: [{ type: "text", text: "Notification sent." }],
     };
@@ -135,7 +124,11 @@ server.registerTool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Telegram MCP bridge running");
+  console.error("Telegram MCP bridge: MCP connected");
+
+  // Start Telegram polling AFTER MCP is connected
+  await bot.startPolling();
+  console.error("Telegram MCP bridge: Bot polling started");
 }
 
 main().catch((err) => {
