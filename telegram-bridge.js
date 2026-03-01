@@ -17,6 +17,13 @@ if (!BOT_TOKEN || !CHAT_ID) {
 
 const ASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // --- Telegram Bot (polling starts AFTER MCP connects) ---
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: false });
@@ -85,7 +92,7 @@ server.tool(
       };
     }
 
-    await bot.sendMessage(CHAT_ID, message, opts);
+    await bot.sendMessage(CHAT_ID, escapeHtml(message), opts);
 
     const response = await new Promise((resolve, reject) => {
       pendingResolve = resolve;
@@ -112,7 +119,7 @@ server.tool(
     message: z.string().describe("The notification message to send"),
   },
   async ({ message }) => {
-    await bot.sendMessage(CHAT_ID, message, { parse_mode: "HTML" });
+    await bot.sendMessage(CHAT_ID, escapeHtml(message), { parse_mode: "HTML" });
     return {
       content: [{ type: "text", text: "Notification sent." }],
     };
